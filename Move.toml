@@ -1,0 +1,10 @@
+[package]
+name = "suiX"
+version = "0.0.1"
+
+[dependencies]
+Sui = { local = "../sui/crates/sui-framework" }
+
+
+[addresses]
+suix =  "0x0"

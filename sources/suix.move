@@ -60,12 +60,12 @@ module suix::suix {
 
     /// Entrypoint for the `remove_liquidity` method. Transfers
     /// withdrawn assets (SUI) to the sender.
-    entry fun remove_liquidity_<P, T>(
+    entry fun remove_liquidity_(
         pool: &mut Pool,
-        lsp: Coin<SUIX>,
+        suix: Coin<SUIX>,
         ctx: &mut TxContext
     ) {
-        let (sui ) = remove_liquidity(pool, lsp, ctx);
+        let (sui ) = remove_liquidity(pool, suix, ctx);
         let sender = tx_context::sender(ctx);
 
         transfer::transfer(sui, sender);
@@ -75,17 +75,17 @@ module suix::suix {
     /// Returns `Coin<SUI>`.
     public fun remove_liquidity (
         pool: &mut Pool,
-        lsp: Coin<SUIX>,
+        suix: Coin<SUIX>,
         ctx: &mut TxContext
     ): Coin<SUI> {
-        let lsp_amount = coin::value(&lsp);
+        let suix_amount = coin::value(&suix);
 
         // If there's a non-empty LSP, we can
-        assert!(lsp_amount > 0, EZeroAmount);
+        assert!(suix_amount > 0, EZeroAmount);
 
-        let sui_removed = lsp_amount;
+        let sui_removed = suix_amount;
 
-        balance::decrease_supply(&mut pool.suix_supply, coin::into_balance(lsp));
+        balance::decrease_supply(&mut pool.suix_supply, coin::into_balance(suix));
 
         coin::take(&mut pool.sui, sui_removed, ctx)
     }
@@ -107,15 +107,16 @@ module suix::suix {
 
 #[test_only]
 module suix::suix_tests {
-        // utilities
-    // use sui::coin::{mint_for_testing as mint, destroy_for_testing as burn};
+    use sui::coin::{mint_for_testing as mint, destroy_for_testing as burn};
     use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
-    use suix::suix::{Self, Pool };
+    use suix::suix::{Self, Pool, SUIX };
+    use sui::sui::SUI;
 
     // Tests section
    #[test] fun test_init_pool() { test_init_pool_(&mut scenario()) }
+   #[test] fun test_add_liquidity() { test_add_liquidity_(&mut scenario()) }
+   #[test] fun test_remove_liquidity() { test_remove_liquidity_(&mut scenario()) }
 
-    fun scenario(): Scenario { test::begin(&@0x1) }
 
     fun test_init_pool_(test: &mut Scenario) {
         let (owner, _) = people();
@@ -137,5 +138,70 @@ module suix::suix_tests {
         };
     }
 
-     fun people(): (address, address) { (@0xBEEF, @0xA11CE) }
+    fun test_add_liquidity_(test: &mut Scenario) {
+        test_init_pool_(test);
+
+        let (_, theguy) = people();
+
+        next_tx(test, &theguy); {
+            let pool = test::take_shared<Pool>(test);
+            let pool_mut = test::borrow_mut(&mut pool);
+
+            let suix_tokens = suix::add_liquidity(
+                pool_mut,
+                mint<SUI>(100, ctx(test)),
+                ctx(test)
+            );
+
+            let (_, suix_supply) = suix::get_amounts(pool_mut);
+            assert!(burn(suix_tokens) == suix_supply, 1);
+
+            test::return_shared(test, pool)
+        };
+    }
+
+
+    /// Expect SUIX tokens to double in supply when the same values passed
+    fun test_remove_liquidity_(test: &mut Scenario) {
+        test_init_pool_(test);
+
+        let (_, theguy) = people();
+
+        next_tx(test, &theguy); {
+            let pool = test::take_shared<Pool>(test);
+            let pool_mut = test::borrow_mut(&mut pool);
+
+            let suix_tokens = suix::add_liquidity(
+                pool_mut,
+                mint<SUI>(100, ctx(test)),
+                ctx(test)
+            );
+
+            let (_, suix_supply) = suix::get_amounts(pool_mut);
+            assert!(burn(suix_tokens) == suix_supply, 1);
+
+            test::return_shared(test, pool)
+        };
+
+        next_tx(test, &theguy); {
+            let pool = test::take_shared<Pool>(test);
+            let pool_mut = test::borrow_mut(&mut pool);
+
+            let sui = suix::remove_liquidity(
+                pool_mut,
+                mint<SUIX>(100, ctx(test)),
+                ctx(test)
+            );
+
+            let (_, suix_supply) = suix::get_amounts(pool_mut);
+            assert!(0 == suix_supply, suix_supply);
+
+            assert!(burn(sui) == 100, 1);
+            test::return_shared(test, pool)
+        };
+    }
+
+    // utilities
+    fun scenario(): Scenario { test::begin(&@0x1) }
+    fun people(): (address, address) { (@0xBEEF, @0xA11CE) }
 }

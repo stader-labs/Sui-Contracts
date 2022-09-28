@@ -5,11 +5,15 @@ module suix::suix {
     use sui::sui::SUI;
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
-
+    use sui::sui_system::{Self, SuiSystemState };
+    use sui::delegation::Delegation;
     struct SUIX has drop {}
 
     /// For when supplied Coin is zero.
     const EZeroAmount: u64 = 0;
+
+    /// Capability that grants an owner the right to collect SUI.
+    struct OwnerCap has key { id: UID }
 
     struct Pool has key {
         id: UID,
@@ -20,6 +24,10 @@ module suix::suix {
     }
 
     fun init(witness: SUIX, ctx: &mut TxContext) {
+        transfer::transfer(OwnerCap {
+            id: object::new(ctx)
+        }, tx_context::sender(ctx));
+
         transfer::share_object(Pool {
             id: object::new(ctx),
             sui: balance::zero<SUI>(),
@@ -90,6 +98,19 @@ module suix::suix {
         coin::take(&mut pool.sui, sui_removed, ctx)
     }
 
+    /// Take coin from `Pool` and transfer it to tx sender.
+    /// Requires authorization with `OwnerCap`.
+    /// We will delegation from here
+    public entry fun collect_sui(
+        _: &OwnerCap, poll: &mut Pool, ctx: &mut TxContext
+    ) {
+        let amount = balance::value(&poll.sui);
+        let profits = coin::take(&mut poll.sui, amount, ctx);
+
+        transfer::transfer(profits, tx_context::sender(ctx))
+    }
+
+
     /// Get most used values in a handy way:
     /// - amount of SUI
     /// - total supply of SUIX
@@ -99,6 +120,25 @@ module suix::suix {
             balance::supply_value(&pool.suix_supply)
         )
     }
+
+    // Delegation section
+    public entry fun request_add_delegation(
+        self: &mut SuiSystemState,
+        delegate_stake: Coin<SUI>,
+        validator_address: address,
+        ctx: &mut TxContext,
+    ) {
+        sui_system::request_add_delegation(self, delegate_stake, validator_address, ctx);
+    }
+
+    public entry fun request_remove_delegation(
+        self: &mut SuiSystemState,
+        delegation: &mut Delegation,
+        ctx: &mut TxContext,
+    ) {
+        sui_system::request_remove_delegation(self, delegation, ctx);
+    }
+
     #[test_only]
     public fun init_for_testing(ctx: &mut TxContext) {
         init(SUIX {}, ctx)

@@ -25,7 +25,11 @@ module suix::suix {
         fee_percent: u64
     }
 
+
     fun init(witness: SUIX, ctx: &mut TxContext) {
+        
+        // debug::print(&tx_context::sender(ctx));
+
         transfer::transfer(OwnerCap {
             id: object::new(ctx)
         }, tx_context::sender(ctx));
@@ -65,6 +69,27 @@ module suix::suix {
         let balance = balance::increase_supply(&mut pool.suix_supply, share_minted);
 
         balance::join(&mut pool.sui, sui_balance);
+
+        // sui_system::request_add_delegation(state, delegate_stake, validator_address, ctx);
+        coin::from_balance(balance, ctx)
+    }
+
+    public fun add_liquidity_and_delegate(
+        pool: &mut Pool, 
+        sui: Coin<SUI>, 
+        state: &mut SuiSystemState,
+        validator_address: address,
+        ctx: &mut TxContext
+
+    ): Coin<SUIX> {
+        assert!(coin::value(&sui) > 0, EZeroAmount);
+
+        let sui_added = coin::value(&sui);
+        let share_minted = sui_added;
+
+        let balance = balance::increase_supply(&mut pool.suix_supply, share_minted);
+
+        sui_system::request_add_delegation(state, sui, validator_address, ctx);
         coin::from_balance(balance, ctx)
     }
 
@@ -89,8 +114,6 @@ module suix::suix {
         ctx: &mut TxContext
     ): Coin<SUI> {
         let suix_amount = coin::value(&suix);
-
-        // If there's a non-empty LSP, we can
         assert!(suix_amount > 0, EZeroAmount);
 
         let sui_removed = suix_amount;
@@ -126,32 +149,32 @@ module suix::suix {
     // Delegation section
     public entry fun request_add_delegation(
         _: &OwnerCap,
-        self: &mut SuiSystemState,
+        state: &mut SuiSystemState,
         delegate_stake: Coin<SUI>,
         validator_address: address,
         ctx: &mut TxContext,
     ) {
-        sui_system::request_add_delegation(self, delegate_stake, validator_address, ctx);
+        sui_system::request_add_delegation(state, delegate_stake, validator_address, ctx);
     }
 
     public entry fun request_remove_delegation(
         _: &OwnerCap,
-        self: &mut SuiSystemState,
+        state: &mut SuiSystemState,
         delegation: &mut Delegation,
         ctx: &mut TxContext,
     ) {
-        sui_system::request_remove_delegation(self, delegation, ctx);
+        sui_system::request_remove_delegation(state, delegation, ctx);
     }
 
     public entry fun claim_delegation_reward(
         _: &OwnerCap,
-        self: &mut SuiSystemState,
+        state: &mut SuiSystemState,
         delegation: &mut Delegation,
         epoch_reward_record: &mut EpochRewardRecord,
         ctx: &mut TxContext,
     ) {
 
-        sui_system::claim_delegation_reward(self, delegation, epoch_reward_record,ctx);
+        sui_system::claim_delegation_reward(state, delegation, epoch_reward_record,ctx);
     }
 
     #[test_only]

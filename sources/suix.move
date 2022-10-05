@@ -70,7 +70,6 @@ module suix::suix {
 
         balance::join(&mut pool.sui, sui_balance);
 
-        // sui_system::request_add_delegation(state, delegate_stake, validator_address, ctx);
         coin::from_balance(balance, ctx)
     }
 

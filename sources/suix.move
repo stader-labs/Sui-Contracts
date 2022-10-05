@@ -6,8 +6,6 @@ module suix::suix {
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
     use sui::sui_system::{Self, SuiSystemState };
-    use sui::delegation::Delegation;
-    use sui::epoch_reward_record::EpochRewardRecord;
 
     struct SUIX has drop {}
 
@@ -154,26 +152,6 @@ module suix::suix {
         ctx: &mut TxContext,
     ) {
         sui_system::request_add_delegation(state, delegate_stake, validator_address, ctx);
-    }
-
-    public entry fun request_remove_delegation(
-        _: &OwnerCap,
-        state: &mut SuiSystemState,
-        delegation: &mut Delegation,
-        ctx: &mut TxContext,
-    ) {
-        sui_system::request_remove_delegation(state, delegation, ctx);
-    }
-
-    public entry fun claim_delegation_reward(
-        _: &OwnerCap,
-        state: &mut SuiSystemState,
-        delegation: &mut Delegation,
-        epoch_reward_record: &mut EpochRewardRecord,
-        ctx: &mut TxContext,
-    ) {
-
-        sui_system::claim_delegation_reward(state, delegation, epoch_reward_record,ctx);
     }
 
     #[test_only]

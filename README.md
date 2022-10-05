@@ -1,8 +1,12 @@
 # SUIX
 
-# build: `make build`
+# build:
 
-# publish: `make publish`
+`make build`
+
+# publish:
+
+`make publish`
 
 Devnet: ${SUIX}
 

@@ -26,8 +26,6 @@ module suix::suix {
 
     fun init(witness: SUIX, ctx: &mut TxContext) {
         
-        // debug::print(&tx_context::sender(ctx));
-
         transfer::transfer(OwnerCap {
             id: object::new(ctx)
         }, tx_context::sender(ctx));
@@ -163,100 +161,105 @@ module suix::suix {
 #[test_only]
 module suix::suix_tests {
     use sui::coin::{mint_for_testing as mint, destroy_for_testing as burn};
-    use sui::test_scenario::{Self as test, Scenario, next_tx, ctx};
+    use sui::test_scenario::{Self, Scenario, next_tx, ctx};
     use suix::suix::{Self, Pool, SUIX };
     use sui::sui::SUI;
 
-    // Tests section
-   #[test] fun test_init_pool() { test_init_pool_(&mut scenario()) }
-   #[test] fun test_add_liquidity() { test_add_liquidity_(&mut scenario()) }
-   #[test] fun test_remove_liquidity() { test_remove_liquidity_(&mut scenario()) }
+   #[test] fun test_add_liquidity() { test_add_liquidity_( scenario()) }
+   #[test] fun test_remove_liquidity() { test_remove_liquidity_(scenario()) }
 
 
-    fun test_init_pool_(test: &mut Scenario) {
+    fun test_init_pool_(scenario: &mut Scenario) {
         let (owner, _) = people();
 
-        next_tx(test, &owner); {
-            suix::init_for_testing(ctx(test));
+        next_tx(scenario, owner); {
+            suix::init_for_testing(ctx(scenario));
         };
 
 
-        next_tx(test, &owner); {
-            let pool = test::take_shared<Pool>(test);
-            let pool_mut = test::borrow_mut(&mut pool);
+        next_tx(scenario, owner); {
+            let pool = test_scenario::take_shared<Pool>(scenario);
+            let pool_mut = &mut pool;
             let (amt_sui, suix_supply) = suix::get_amounts(pool_mut);
 
             assert!(suix_supply == 0, suix_supply);
             assert!(amt_sui == 0, 0);
 
-            test::return_shared(test, pool)
+            test_scenario::return_shared(pool)
         };
+
     }
 
-    fun test_add_liquidity_(test: &mut Scenario) {
-        test_init_pool_(test);
+    fun test_add_liquidity_(test:  Scenario) {
+        let scenario = &mut test;
+
+        test_init_pool_(scenario);
 
         let (_, theguy) = people();
 
-        next_tx(test, &theguy); {
-            let pool = test::take_shared<Pool>(test);
-            let pool_mut = test::borrow_mut(&mut pool);
+        next_tx(scenario, theguy); {
+            let pool = test_scenario::take_shared<Pool>(scenario);
+            let pool_mut = &mut pool;
 
             let suix_tokens = suix::add_liquidity(
                 pool_mut,
-                mint<SUI>(100, ctx(test)),
-                ctx(test)
+                mint<SUI>(100, ctx(scenario)),
+                ctx(scenario)
             );
 
             let (_, suix_supply) = suix::get_amounts(pool_mut);
             assert!(burn(suix_tokens) == suix_supply, 1);
 
-            test::return_shared(test, pool)
+            test_scenario::return_shared(pool)
         };
+        test_scenario::end(test);
     }
 
 
     /// Expect SUIX tokens to double in supply when the same values passed
-    fun test_remove_liquidity_(test: &mut Scenario) {
-        test_init_pool_(test);
+    fun test_remove_liquidity_(test: Scenario) {
+        let scenario = &mut test;
+
+        test_init_pool_(scenario);
 
         let (_, theguy) = people();
 
-        next_tx(test, &theguy); {
-            let pool = test::take_shared<Pool>(test);
-            let pool_mut = test::borrow_mut(&mut pool);
+        next_tx(scenario, theguy); {
+            let pool = test_scenario::take_shared<Pool>(scenario);
+            let pool_mut = &mut pool;
 
             let suix_tokens = suix::add_liquidity(
                 pool_mut,
-                mint<SUI>(100, ctx(test)),
-                ctx(test)
+                mint<SUI>(100, ctx(scenario)),
+                ctx(scenario)
             );
 
             let (_, suix_supply) = suix::get_amounts(pool_mut);
             assert!(burn(suix_tokens) == suix_supply, 1);
 
-            test::return_shared(test, pool)
+            test_scenario::return_shared(pool)
         };
 
-        next_tx(test, &theguy); {
-            let pool = test::take_shared<Pool>(test);
-            let pool_mut = test::borrow_mut(&mut pool);
+        next_tx(scenario, theguy); {
+            let pool = test_scenario::take_shared<Pool>(scenario);
+            let pool_mut = &mut pool;
 
             let sui = suix::remove_liquidity(
                 pool_mut,
-                mint<SUIX>(100, ctx(test)),
-                ctx(test)
+                mint<SUIX>(100, ctx(scenario)),
+                ctx(scenario)
             );
 
             let (_, suix_supply) = suix::get_amounts(pool_mut);
             assert!(0 == suix_supply, suix_supply);
 
             assert!(burn(sui) == 100, 1);
-            test::return_shared(test, pool)
+            test_scenario::return_shared(pool)
         };
+        test_scenario::end(test);
     }
 
     // utilities
-    fun scenario(): Scenario { test::begin(&@0x1) }
+    fun scenario(): Scenario { test_scenario::begin(@0x1) }
     fun people(): (address, address) { (@0xBEEF, @0xA11CE) }
 }

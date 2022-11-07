@@ -2,6 +2,7 @@ module suix::suix {
     use sui::object::{Self, UID};
     use sui::coin::{Self, Coin};
     use sui::balance::{Self, Supply, Balance};
+    use sui::staking_pool::{Delegation, StakedSui};
     use sui::sui::SUI;
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
@@ -69,24 +70,7 @@ module suix::suix {
         coin::from_balance(balance, ctx)
     }
 
-    public fun add_liquidity_and_delegate(
-        pool: &mut Pool, 
-        sui: Coin<SUI>, 
-        state: &mut SuiSystemState,
-        validator_address: address,
-        ctx: &mut TxContext
 
-    ): Coin<SUIX> {
-        assert!(coin::value(&sui) > 0, EZeroAmount);
-
-        let sui_added = coin::value(&sui);
-        let share_minted = sui_added;
-
-        let balance = balance::increase_supply(&mut pool.suix_supply, share_minted);
-
-        sui_system::request_add_delegation(state, sui, validator_address, ctx);
-        coin::from_balance(balance, ctx)
-    }
 
     /// Entrypoint for the `remove_liquidity` method. Transfers
     /// withdrawn assets (SUI) to the sender.
@@ -118,6 +102,45 @@ module suix::suix {
         coin::take(&mut pool.sui, sui_removed, ctx)
     }
 
+    public fun remove_liquidity_and_undelegation(
+        pool: &mut Pool,
+        suix: Coin<SUIX>, 
+        state: &mut SuiSystemState,
+        delegation: &mut Delegation,
+        staked_sui: &mut StakedSui,
+        withdraw_pool_token_amount: u64,
+        ctx: &mut TxContext,
+    ) {
+        balance::decrease_supply(&mut pool.suix_supply, coin::into_balance(suix));
+
+        sui_system::request_withdraw_delegation(
+            state, 
+            delegation, 
+            staked_sui,
+            withdraw_pool_token_amount, 
+            ctx
+        );
+    } 
+
+    public fun add_liquidity_and_delegate(
+        pool: &mut Pool, 
+        sui: Coin<SUI>, 
+        state: &mut SuiSystemState,
+        validator_address: address,
+        ctx: &mut TxContext
+
+    ): Coin<SUIX> {
+        assert!(coin::value(&sui) > 0, EZeroAmount);
+
+        let sui_added = coin::value(&sui);
+        let share_minted = sui_added;
+
+        let balance = balance::increase_supply(&mut pool.suix_supply, share_minted);
+
+        sui_system::request_add_delegation(state, sui, validator_address, ctx);
+        coin::from_balance(balance, ctx)
+    }
+
     /// Take coin from `Pool` and transfer it to tx sender.
     /// Requires authorization with `OwnerCap`.
     /// We will delegation from here
@@ -141,16 +164,6 @@ module suix::suix {
         )
     }
 
-    // Delegation section
-    public entry fun request_add_delegation(
-        _: &OwnerCap,
-        state: &mut SuiSystemState,
-        delegate_stake: Coin<SUI>,
-        validator_address: address,
-        ctx: &mut TxContext,
-    ) {
-        sui_system::request_add_delegation(state, delegate_stake, validator_address, ctx);
-    }
 
     #[test_only]
     public fun init_for_testing(ctx: &mut TxContext) {

@@ -6,7 +6,7 @@ module suix::suix {
     use sui::sui::SUI;
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
-    use sui::sui_system::{Self, SuiSystemState };
+    use sui::sui_system::{Self, SuiSystemState};
 
     struct SUIX has drop {}
 
@@ -176,6 +176,7 @@ module suix::suix_tests {
     use sui::coin::{mint_for_testing as mint, destroy_for_testing as burn};
     use sui::test_scenario::{Self, Scenario, next_tx, ctx};
     use suix::suix::{Self, Pool, SUIX };
+    use sui::sui_system::{SuiSystemState};
     use sui::sui::SUI;
 
    #[test] fun test_add_liquidity() { test_add_liquidity_( scenario()) }
@@ -188,7 +189,9 @@ module suix::suix_tests {
         next_tx(scenario, owner); {
             suix::init_for_testing(ctx(scenario));
         };
-
+        next_tx(scenario, VALIDATOR_ADDR_1); { 
+            set_up_sui_system_state(scenario);
+        };
 
         next_tx(scenario, owner); {
             let pool = test_scenario::take_shared<Pool>(scenario);
@@ -200,7 +203,6 @@ module suix::suix_tests {
 
             test_scenario::return_shared(pool)
         };
-
     }
 
     fun test_add_liquidity_(test:  Scenario) {
@@ -227,6 +229,58 @@ module suix::suix_tests {
         };
         test_scenario::end(test);
     }
+    use sui::governance_test_utils::{
+        create_validator_for_testing,
+        create_sui_system_state_for_testing
+    };
+
+    const VALIDATOR_ADDR_1: address = @0x1;
+    const VALIDATOR_ADDR_2: address = @0x2;
+
+    #[test_only]
+    fun set_up_sui_system_state(scenario: &mut Scenario) {
+        let ctx = test_scenario::ctx(scenario);
+
+        let validators = vector[
+            create_validator_for_testing(VALIDATOR_ADDR_1, 100, ctx),
+            create_validator_for_testing(VALIDATOR_ADDR_2, 100, ctx)
+        ];
+        create_sui_system_state_for_testing(validators, 300, 100);
+    }
+
+    fun test_delegation(test:  Scenario) {
+        let scenario = &mut test;
+
+        test_init_pool_(scenario);
+
+
+
+        let (_, theguy) = people();
+        next_tx(scenario, theguy); {
+            let pool = test_scenario::take_shared<Pool>(scenario);
+            let pool_mut = &mut pool;
+
+
+            let state = test_scenario::take_shared<SuiSystemState>(scenario);
+            let state_mut = &mut state;
+
+            let suix_tokens = suix::add_liquidity_and_delegate(
+                pool_mut,
+                mint<SUI>(100, ctx(scenario)),
+                state_mut,
+                VALIDATOR_ADDR_1,
+                ctx(scenario)
+            );
+
+            let (_, suix_supply) = suix::get_amounts(pool_mut);
+            assert!(burn(suix_tokens) == suix_supply, 1);
+
+            test_scenario::return_shared(pool);
+            test_scenario::return_shared(state);
+        };
+        test_scenario::end(test);
+    }
+
 
 
     /// Expect SUIX tokens to double in supply when the same values passed

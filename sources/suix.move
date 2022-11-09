@@ -180,9 +180,12 @@ module suix::suix_tests {
     use sui::sui::SUI;
 
    #[test] fun test_add_liquidity() { test_add_liquidity_( scenario()) }
+   // TODO: FIX this test failed
+//    #[test] fun test_delegation() { test_delegation_( scenario()) }
    #[test] fun test_remove_liquidity() { test_remove_liquidity_(scenario()) }
 
 
+    use std::debug;
     fun test_init_pool_(scenario: &mut Scenario) {
         let (owner, _) = people();
 
@@ -234,6 +237,10 @@ module suix::suix_tests {
         create_sui_system_state_for_testing
     };
 
+    use sui::object::{Self};
+    use sui::tx_context::{Self};
+    use sui::staking_pool::{Delegation};
+
     const VALIDATOR_ADDR_1: address = @0x1;
     const VALIDATOR_ADDR_2: address = @0x2;
 
@@ -248,12 +255,12 @@ module suix::suix_tests {
         create_sui_system_state_for_testing(validators, 300, 100);
     }
 
-    fun test_delegation(test:  Scenario) {
+    fun test_delegation_(test:  Scenario) {
         let scenario = &mut test;
 
+        debug::print(&b"123");
+
         test_init_pool_(scenario);
-
-
 
         let (_, theguy) = people();
         next_tx(scenario, theguy); {
@@ -272,9 +279,14 @@ module suix::suix_tests {
                 ctx(scenario)
             );
 
-            let (_, suix_supply) = suix::get_amounts(pool_mut);
-            assert!(burn(suix_tokens) == suix_supply, 1);
+            let id1 = object::id_from_address(tx_context::last_created_object_id(ctx(scenario)));
+            let obj1 = test_scenario::take_from_sender_by_id<Delegation>(scenario, id1);
 
+
+            let (_, suix_supply) = suix::get_amounts(pool_mut);
+            assert!(burn(suix_tokens) == suix_supply, 2);
+
+            test_scenario::return_to_sender(scenario, obj1);
             test_scenario::return_shared(pool);
             test_scenario::return_shared(state);
         };

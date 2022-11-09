@@ -8,4 +8,4 @@ publish:
 build:
 	sui move build
 test:
-	sui move test
+	sui move test --force | aptos-pprint

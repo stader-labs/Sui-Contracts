@@ -1,5 +1,7 @@
 # SUIX
 
+https://miro.com/app/board/uXjVOqmySQA=/?share_link_id=770786897960
+
 # build:
 
 `make build`
